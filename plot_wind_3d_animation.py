@@ -1,10 +1,14 @@
 import netCDF4 as nc
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # 设置后端为Agg
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
 import os
+import multiprocessing as mp
+from functools import partial
 
 def process_wind_data(dataset, time_step, sample_rate, n_layers, mode='bottom'):
     """处理风速数据"""
@@ -101,10 +105,16 @@ def create_3d_wind_animation(file_path, output_path, mode='bottom', n_layers=3, 
         colors_array = []
         
         # 收集所有点和对应的颜色
-        for k in range(n_layers):
-            mask = ~np.isnan(wind_speed[:, :, k])
-            points.extend(zip(xx[mask].flatten(), yy[mask].flatten(), np.full_like(xx[mask].flatten(), z[k])))
-            colors_array.extend(wind_speed[:, :, k][mask].flatten())
+        if mode == 'bottom':
+            for k in range(n_layers):
+                mask = ~np.isnan(wind_speed[:, :, k])
+                points.extend(zip(xx[mask].flatten(), yy[mask].flatten(), np.full_like(xx[mask].flatten(), z[k])))
+                colors_array.extend(wind_speed[:, :, k][mask].flatten())
+        else:
+            for k in range(len(z)):
+                mask = ~np.isnan(wind_speed[:, :, k])
+                points.extend(zip(xx[mask].flatten(), yy[mask].flatten(), np.full_like(xx[mask].flatten(), z[k])))
+                colors_array.extend(wind_speed[:, :, k][mask].flatten())
         
         points = np.array(points)
         colors_array = np.array(colors_array)
@@ -138,26 +148,55 @@ def create_3d_wind_animation(file_path, output_path, mode='bottom', n_layers=3, 
     # 创建动画
     frames = range(0, 200, 1)  # 每10个时间步取一帧，总共200帧
     anim = animation.FuncAnimation(fig, update, frames=frames,
-                                 interval=500, blit=False)
+                                 interval=200, blit=False)
     
     # 保存动画
-    anim.save(output_path, writer='pillow', fps=2)
+    writer = animation.PillowWriter(fps=5)
+    anim.save(output_path, writer=writer, dpi=300)
     
     # 关闭数据集和图形
     dataset.close()
     plt.close()
 
+def process_animation(params, file_path):
+    """单个动画处理函数"""
+    output_path = f'animations/wind_speed_3d_{params["mode"]}_{params["n_layers"]}layers_sr{params["sample_rate"]}.gif'
+    print(f"生成动画: {output_path}")
+    create_3d_wind_animation(
+        file_path, 
+        output_path, 
+        mode=params['mode'], 
+        n_layers=params['n_layers'], 
+        sample_rate=params['sample_rate']
+    )
+
 def main():
     # 创建输出目录
     os.makedirs('animations', exist_ok=True)
     
-    # 设置参数
+    # 设置基础参数
     file_path = '/home/mxj/docker_palm/share/tongren02_OUTPUT/tongren02_3d.000.nc'
-    output_path = 'animations/wind_speed_3d_animation.gif'
     
-    print("开始生成风场动画...")
-    create_3d_wind_animation(file_path, output_path, mode='bottom', n_layers=5, sample_rate=1)
-    print(f"动画已保存到: {output_path}")
+    # 定义不同参数组合
+    param_combinations = [
+        {'mode': 'bottom', 'n_layers': 4, 'sample_rate': 2},
+        {'mode': 'bottom', 'n_layers': 5, 'sample_rate': 2},
+        {'mode': 'terrain', 'n_layers': 1, 'sample_rate': 2},
+        {'mode': 'terrain', 'n_layers': 3, 'sample_rate': 2},
+        {'mode': 'terrain', 'n_layers': 5, 'sample_rate': 2},
+        {'mode': 'terrain', 'n_layers': 10, 'sample_rate': 2},
+    ]
+    
+    print("开始并行生成风场动画...")
+    
+    # 创建进程池
+    with mp.Pool() as pool:
+        # 使用partial固定file_path参数
+        process_func = partial(process_animation, file_path=file_path)
+        # 并行处理所有参数组合
+        pool.map(process_func, param_combinations)
+    
+    print("所有动画生成完成！")
 
 if __name__ == "__main__":
     main() 

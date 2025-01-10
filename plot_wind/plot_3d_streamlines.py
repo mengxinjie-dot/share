@@ -172,8 +172,8 @@ class WindStreamlinesPlotter:
                 
                 # 获取该位置的地形高度
                 terrain_height = self.terrain_z[y_idx, x_idx]
-                    
-                z_start = np.arange(terrain_height + 50, terrain_height + 50*nz, 50)  # 从地形上方50米开始,每隔50米创建一个点
+                height_step = 50
+                z_start = np.arange(terrain_height + height_step, terrain_height + height_step*nz, height_step)  # 从地形上方50米开始,每隔50米创建一个点
                 
                 # 添加所有起始点
                 for z_pos in z_start:

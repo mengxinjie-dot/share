@@ -39,7 +39,7 @@ class WindVisualizationPlotter(WindStreamlinesPlotter):
         
         # 默认箭头配置
         self.arrow_config = {
-            'scale': 100,  # 箭头缩放因子
+            'scale': 200,  # 箭头缩放因子
             'shaft_radius': 0.15,  # 箭头轴半径
             'tip_radius': 0.3,  # 箭头头部半径
             'tip_length': 0.5,  # 箭头头部长度
